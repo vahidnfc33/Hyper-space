@@ -16,18 +16,16 @@ function main_menu() {
         echo "2. 查看日志"
         echo "3. 查看积分"
         echo "4. 删除节点（停止节点）"
-        echo "5. 启用日志监控"
         echo "6. 退出脚本"
         echo "================================================================"
-        read -p "请输入选择 (1/2/3/4/5/6): " choice
+        read -p "请输入选择 (1/2/3/4/5): " choice
 
         case $choice in
             1)  deploy_hyperspace_node ;;
             2)  view_logs ;; 
             3)  view_points ;;
             4)  delete_node ;;
-            5)  start_log_monitor ;;
-            6)  exit_script ;;
+            5)  exit_script ;;
             *)  echo "无效选择，请重新输入！"; sleep 2 ;;
         esac
     done
@@ -167,65 +165,6 @@ function delete_node() {
     sleep 2
     
     echo "'aios-cli kill' 执行完成，节点已停止。"
-
-    # 提示用户按任意键返回主菜单
-    read -n 1 -s -r -p "按任意键返回主菜单..."
-    main_menu
-}
-
-# 启用日志监控
-function start_log_monitor() {
-    echo "启动日志监控..."
-
-    # 创建监控脚本文件
-    cat > /root/monitor.sh << 'EOL'
-#!/bin/bash
-LOG_FILE="/root/aios-cli.log"
-SCREEN_NAME="hyper"
-LAST_RESTART=$(date +%s)
-MIN_RESTART_INTERVAL=300
-
-while true; do
-    current_time=$(date +%s)
-    
-    # 检测到以下几种情况，触发重启
-    if (tail -n 4 "$LOG_FILE" | grep -q "Last pong received.*Sending reconnect signal" || \
-        tail -n 4 "$LOG_FILE" | grep -q "Failed to authenticate" || \
-        tail -n 4 "$LOG_FILE" | grep -q "Failed to connect to Hive" || \
-        tail -n 4 "$LOG_FILE" | grep -q "Another instance is already running" || \
-        tail -n 4 "$LOG_FILE" | grep -q "\"message\": \"Internal server error\"") && \
-       [ $((current_time - LAST_RESTART)) -gt $MIN_RESTART_INTERVAL ]; then
-        echo "$(date): 检测到连接问题、认证失败、连接到 Hive 失败、实例已在运行或内部服务器错误，正在重启服务..." >> /root/monitor.log
-        
-        # 先发送 Ctrl+C
-        screen -S "$SCREEN_NAME" -X stuff $'\003'
-        sleep 5
-        
-        # 执行 aios-cli kill
-        screen -S "$SCREEN_NAME" -X stuff "aios-cli kill\n"
-        sleep 5
-        
-        echo "$(date): 清理旧日志..." > "$LOG_FILE"
-        
-        # 重新启动服务
-        screen -S "$SCREEN_NAME" -X stuff "aios-cli start --connect >> /root/aios-cli.log 2>&1\n"
-        
-        LAST_RESTART=$current_time
-        echo "$(date): 服务已重启" >> /root/monitor.log
-    fi
-    sleep 30
-done
-EOL
-
-    # 添加执行权限
-    chmod +x /root/monitor.sh
-
-    # 在后台启动监控脚本
-    nohup /root/monitor.sh > /root/monitor.log 2>&1 &
-
-    echo "日志监控已启动，后台运行中。"
-    echo "可以通过查看 /root/monitor.log 来检查监控状态"
-    sleep 2
 
     # 提示用户按任意键返回主菜单
     read -n 1 -s -r -p "按任意键返回主菜单..."
